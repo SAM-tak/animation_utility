@@ -6,11 +6,10 @@ bl_info = {
     "name": "Animation Utility",
     "author": "SAMtak",
     "version": (0, 1),
-    "blender": (2, 80, 0),
+    "blender": (3, 2, 0),
     "location": "Dopesheet Editor Menu, Graph Editor Menu",
     "description": "Animation Utility Tools",
-    "warning": "",
-    "support": "TESTING",
+    "support": "COMMUNITY",
     "wiki_url": "",
     "tracker_url": "",
     "category": "Animation"
@@ -27,9 +26,9 @@ from mathutils import Quaternion
 
 
 class RemoveLockedChannelOperator(bpy.types.Operator):
-    bl_idname = "animutils.remove_locked_channel"
-    bl_label = "Remove Locked Channel"
-    bl_description = "Remove Locked Channel"
+    bl_idname = "animutils.remove_locked_channels"
+    bl_label = "Remove Locked Channels"
+    bl_description = "Remove Locked Channels"
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
@@ -84,10 +83,61 @@ class RemoveLockedChannelOperator(bpy.types.Operator):
 
         return {'FINISHED'}
 
+
+class RemoveInvalidChannelOperator(bpy.types.Operator):
+    bl_idname = "animutils.remove_invalid_channels"
+    bl_label = "Remove Invalid Channels"
+    bl_description = "Remove Invalid Channels"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        if context.area.type == 'DOPESHEET_EDITOR':
+            for i in context.area.spaces:
+                if i.type == 'DOPESHEET_EDITOR' and (i.mode == 'DOPESHEET' or i.mode == 'ACTION') and i.action:
+                    return True
+        return False
+
+    def execute(self, context):
+        #print("exec %s" % (self.bl_idname))
+        dopesheet = None
+        action = None
+        for i in context.area.spaces: #find the dopesheet
+            if i.type == 'DOPESHEET_EDITOR' and (i.mode == 'DOPESHEET' or i.mode == 'ACTION') and i.action:
+                dopesheet = i
+                action = dopesheet.action
+                break
+
+        #print(dopesheet.type)
+        if action:
+            removee_fcurve = []
+            localdic = {'context' : context}
+            for i in action.groups:
+                for j in i.channels:
+                    if j.data_path.endswith('.location'):
+                        pass
+                    elif j.data_path.endswith('.scale'):
+                        pass
+                    elif j.data_path.endswith('.rotation_quaternion'):
+                        pass
+                    elif j.data_path.endswith('.rotation_euler'):
+                        pass
+                    else:
+                        try:
+                            eval(f"context.active_object.{j.data_path}", None, localdic)
+                        except Exception:
+                            removee_fcurve.append(j)
+
+            for fcurve in removee_fcurve:
+                action.fcurves.remove(fcurve)
+
+        return {'FINISHED'}
+
     @staticmethod
     def menu_fn(menu, context):
         menu.layout.separator()
         menu.layout.operator(RemoveLockedChannelOperator.bl_idname)
+        menu.layout.operator(RemoveInvalidChannelOperator.bl_idname)
 
     @classmethod
     def register(cls):
@@ -192,8 +242,8 @@ class RemoveSequencedKeyframeOperator(bpy.types.Operator):
                 print(removee_kf)
                 for kf in removee_kf:
                     for i in range(0, len(fc.keyframe_points)):
-                        if keyframe_points[i].co[0] == kf:
-                            keyframe_points.remove(fc.keyframe_points[i])
+                        if fc.keyframe_points[i].co[0] == kf:
+                            fc.keyframe_points.remove(fc.keyframe_points[i])
                             break
 
                 fc.update()
@@ -487,6 +537,7 @@ class ConvertToBoneAnimationFromShapeKeyAnimation(bpy.types.Operator):
 register, unregister = bpy.utils.register_classes_factory((
     MakeShortestPathQuatsOperator,
     RemoveLockedChannelOperator,
+    RemoveInvalidChannelOperator,
     RemoveSequencedKeyframeOperator,
     ClampEulerAngleOperator,
     SetUpShapeKeyDriver,
