@@ -20,9 +20,8 @@ Keyframe Edit utilities
 """
 
 import bpy
-import sys
 import math
-from mathutils import Quaternion
+from mathutils import Matrix, Quaternion
 
 
 class RemoveLockedChannelOperator(bpy.types.Operator):
@@ -390,6 +389,7 @@ class SetUpShapeKeyDriver(bpy.types.Operator):
                 if bone_name is not None and bone_name in armature.pose.bones:
                     #print('available')
                     pbone = armature.pose.bones[bone_name]
+                    pbone.rotation_mode = 'XYZ'
                     pbone.lock_location = (True, True, True)
                     pbone.lock_rotation = (False, True, True)
                     pbone.lock_rotation_w = True
@@ -534,6 +534,185 @@ class ConvertToBoneAnimationFromShapeKeyAnimation(bpy.types.Operator):
         bpy.types.DOPESHEET_MT_key.remove(cls.menu_fn)
 
 
+class SnapSelectedToCursorMatrixOperator(bpy.types.Operator):
+    bl_idname = "animutils.snap_selected_to_cursor_matrix"
+    bl_label = "Selected To Cursor Loc/Rot"
+    bl_description = "Snap Selected To Cursor Location And Rotation"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        if context.scene:
+            if context.mode == 'OBJECT':
+                return True if context.selected_objects and len(context.selected_objects) > 0 else False
+            elif context.mode == 'POSE':
+                return True if context.selected_pose_bones and len(context.selected_pose_bones) > 0 else False
+            elif context.mode == 'EDIT_ARMATURE':
+                return True if context.selected_editable_bones and len(context.selected_editable_bones) > 0 else False
+        return False
+
+    @staticmethod
+    def mean(matricies) -> Matrix:
+        m = Matrix()
+        m.zero()
+        for i in matricies:
+            m += i
+        m *= 1 / len(matricies)
+        return m
+
+    def execute(self, context):
+        print(f"exec {self.bl_idname} {context.mode}")
+        if context.mode == 'OBJECT':
+            for x in context.selected_objects:
+                x.matrix_world = context.scene.cursor.matrix
+        elif context.mode == 'POSE':
+            for x in context.selected_pose_bones:
+                x.matrix = context.object.matrix_world.inverted() @ context.scene.cursor.matrix
+        elif context.mode == 'EDIT_ARMATURE':
+            for x in context.selected_editable_bones:
+                x.matrix = context.object.matrix_world.inverted() @ context.scene.cursor.matrix
+        return {'FINISHED'}
+
+    @staticmethod
+    def menu_fn(menu, context):
+        menu.layout.separator()
+        menu.layout.operator(SnapSelectedToCursorMatrixOperator.bl_idname)
+
+    @staticmethod
+    def piemenu_fn(menu, context):
+        pie = menu.layout.menu_pie()
+        column = pie.split().column()
+        column.operator(SnapSelectedToCursorMatrixOperator.bl_idname, icon='RESTRICT_SELECT_OFF')
+
+    @classmethod
+    def register(cls):
+        bpy.types.VIEW3D_MT_snap.append(cls.menu_fn)
+        # bpy.types.VIEW3D_MT_snap_pie.append(cls.piemenu_fn)
+
+    @classmethod
+    def unregister(cls):
+        bpy.types.VIEW3D_MT_snap.remove(cls.menu_fn)
+        # bpy.types.VIEW3D_MT_snap_pie.remove(cls.piemenu_fn)
+
+
+class SnapCursorMatrixToSelectedOperator(bpy.types.Operator):
+    bl_idname = "animutils.snap_cursor_matrix_to_selected"
+    bl_label = "Cursor Loc/Rot To Selected"
+    bl_description = "Snap Cursor Location And Rotation To Selected"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        if context.scene:
+            if context.mode == 'OBJECT':
+                return True if context.selected_objects and len(context.selected_objects) > 0 else False
+            elif context.mode == 'POSE':
+                return True if context.selected_pose_bones and len(context.selected_pose_bones) > 0 else False
+            elif context.mode == 'EDIT_ARMATURE':
+                return True if context.selected_editable_bones and len(context.selected_editable_bones) > 0 else False
+        return False
+
+    @staticmethod
+    def mean(matricies) -> Matrix:
+        m = Matrix()
+        m.zero()
+        for i in matricies:
+            m += i
+        m *= 1 / len(matricies)
+        return m
+
+    def execute(self, context):
+        print(f"exec {self.bl_idname} {context.mode}")
+        if context.mode == 'OBJECT':
+            context.scene.cursor.matrix = self.mean([x.matrix_world for x in context.selected_objects])
+        elif context.mode == 'POSE':
+            context.scene.cursor.matrix = context.object.matrix_world @ self.mean([x.matrix for x in context.selected_pose_bones])
+        elif context.mode == 'EDIT_ARMATURE':
+            context.scene.cursor.matrix = context.object.matrix_world @ self.mean([x.matrix for x in context.selected_editable_bones])
+        return {'FINISHED'}
+
+    @staticmethod
+    def menu_fn(menu, context):
+        menu.layout.operator(SnapCursorMatrixToSelectedOperator.bl_idname)
+
+    @staticmethod
+    def piemenu_fn(menu, context):
+        pie = menu.layout.menu_pie()
+        column = pie.split().column()
+        column.operator(SnapCursorMatrixToSelectedOperator.bl_idname, icon='CURSOR')
+
+    @classmethod
+    def register(cls):
+        bpy.types.VIEW3D_MT_snap.append(cls.menu_fn)
+        # bpy.types.VIEW3D_MT_snap_pie.append(cls.piemenu_fn)
+
+    @classmethod
+    def unregister(cls):
+        bpy.types.VIEW3D_MT_snap.remove(cls.menu_fn)
+        # bpy.types.VIEW3D_MT_snap_pie.remove(cls.piemenu_fn)
+
+
+class SnapCursorMatrixToMirroredSelectedOperator(bpy.types.Operator):
+    bl_idname = "animutils.snap_cursor_matrix_to_mirrord_selected"
+    bl_label = "Cursor Loc/Rot To Mirrored Selected"
+    bl_description = "Snap Cursor Location And Rotation To Selected That X-Axis Mirrored"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        if context.scene:
+            if context.mode == 'OBJECT':
+                return True if context.selected_objects and len(context.selected_objects) > 0 else False
+            elif context.mode == 'POSE':
+                return True if context.selected_pose_bones and len(context.selected_pose_bones) > 0 else False
+            elif context.mode == 'EDIT_ARMATURE':
+                return True if context.selected_editable_bones and len(context.selected_editable_bones) > 0 else False
+        return False
+
+    @staticmethod
+    def mirroredmean(matricies) -> Matrix:
+        m = Matrix()
+        m.zero()
+        for i in matricies:
+            m += i
+        m *= 1 / len(matricies)
+        v, q, s = m.decompose()
+        v.x *= -1
+        q.x, q.y = q.y, q.x
+        q.z, q.w = -q.w, -q.z
+        return Matrix.LocRotScale(v, q, s)
+
+    def execute(self, context):
+        print(f"exec {self.bl_idname} {context.mode}")
+        if context.mode == 'OBJECT':
+            context.scene.cursor.matrix = self.mirroredmean([x.matrix_world for x in context.selected_objects])
+        elif context.mode == 'POSE':
+            context.scene.cursor.matrix = context.object.matrix_world @ self.mirroredmean([x.matrix for x in context.selected_pose_bones])
+        elif context.mode == 'EDIT_ARMATURE':
+            context.scene.cursor.matrix = context.object.matrix_world @ self.mirroredmean([x.matrix for x in context.selected_editable_bones])
+        return {'FINISHED'}
+
+    @staticmethod
+    def menu_fn(menu, context):
+        menu.layout.operator(SnapCursorMatrixToMirroredSelectedOperator.bl_idname)
+
+    @staticmethod
+    def piemenu_fn(menu, context):
+        pie = menu.layout.menu_pie()
+        column = pie.split().column()
+        column.operator(SnapCursorMatrixToMirroredSelectedOperator.bl_idname, icon='CURSOR')
+
+    @classmethod
+    def register(cls):
+        bpy.types.VIEW3D_MT_snap.append(cls.menu_fn)
+        # bpy.types.VIEW3D_MT_snap_pie.append(cls.piemenu_fn)
+
+    @classmethod
+    def unregister(cls):
+        bpy.types.VIEW3D_MT_snap.remove(cls.menu_fn)
+        # bpy.types.VIEW3D_MT_snap_pie.remove(cls.piemenu_fn)
+
+
 register, unregister = bpy.utils.register_classes_factory((
     MakeShortestPathQuatsOperator,
     RemoveLockedChannelOperator,
@@ -541,7 +720,10 @@ register, unregister = bpy.utils.register_classes_factory((
     RemoveSequencedKeyframeOperator,
     ClampEulerAngleOperator,
     SetUpShapeKeyDriver,
-    ConvertToBoneAnimationFromShapeKeyAnimation
+    ConvertToBoneAnimationFromShapeKeyAnimation,
+    SnapSelectedToCursorMatrixOperator,
+    SnapCursorMatrixToSelectedOperator,
+    SnapCursorMatrixToMirroredSelectedOperator
 ))
 
 if __name__ == "__main__":
