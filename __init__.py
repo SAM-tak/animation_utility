@@ -358,9 +358,9 @@ class SetUpShapeKeyDriver(bpy.types.Operator):
     def setup(mesh, armature, context):
         #print(mesh, armature)
         # Select armature
-        mesh.select = False
-        armature.select = True
-        armature.hide = False
+        mesh.select_set(False)
+        armature.select_set(True)
+        armature.hide_viewport = False
         context.view_layer.objects.active = armature
         bpy.ops.object.mode_set(mode='EDIT')
 
@@ -395,8 +395,8 @@ class SetUpShapeKeyDriver(bpy.types.Operator):
                     pbone.lock_rotation_w = True
                     pbone.lock_scale = (True, True, True)
 
-        mesh.select = True
-        armature.select = False
+        mesh.select_set(True)
+        armature.select_set(False)
         context.view_layer.objects.active = mesh
         for i in mesh.data.shape_keys.key_blocks:
             if mesh.data.shape_keys.reference_key != i:
