@@ -34,25 +34,24 @@ class RemoveLockedChannelOperator(bpy.types.Operator):
     def poll(cls, context):
         if context.area.type == 'DOPESHEET_EDITOR':
             for i in context.area.spaces:
-                if i.type == 'DOPESHEET_EDITOR' and (i.mode == 'DOPESHEET' or i.mode == 'ACTION') and i.action:
+                if i.type == 'DOPESHEET_EDITOR' and (i.mode == 'DOPESHEET' or i.mode == 'ACTION') and context.active_action:
                     return True
         return False
 
     def execute(self, context):
         #print("exec %s" % (self.bl_idname))
-        dopesheet = None
         action = None
         for i in context.area.spaces: #find the dopesheet
-            if i.type == 'DOPESHEET_EDITOR' and (i.mode == 'DOPESHEET' or i.mode == 'ACTION') and i.action:
-                dopesheet = i
-                action = dopesheet.action
+            if i.type == 'DOPESHEET_EDITOR' and (i.mode == 'DOPESHEET' or i.mode == 'ACTION') and context.active_action:
+                action = context.active_action
                 break
 
         #print(dopesheet.type)
         if action:
+            active_slot = context.object.animation_data.action_slot
             removee_fcurve = []
             localdic = {'context' : context}
-            for i in action.groups:
+            for i in action.layers[0].strips[0].channelbag(active_slot).groups:
                 for j in i.channels:
                     if j.data_path.endswith('.location'):
                         if eval("context.active_object.%s.lock_location[%d]" % (j.data_path[0:-9], j.array_index), None, localdic):
@@ -78,7 +77,7 @@ class RemoveLockedChannelOperator(bpy.types.Operator):
                             removee_fcurve.append(j)
 
             for fcurve in removee_fcurve:
-                action.fcurves.remove(fcurve)
+                action.layers[0].strips[0].channelbag(active_slot).fcurves.remove(fcurve)
 
         return {'FINISHED'}
 
@@ -93,25 +92,24 @@ class RemoveInvalidChannelOperator(bpy.types.Operator):
     def poll(cls, context):
         if context.area.type == 'DOPESHEET_EDITOR':
             for i in context.area.spaces:
-                if i.type == 'DOPESHEET_EDITOR' and (i.mode == 'DOPESHEET' or i.mode == 'ACTION') and i.action:
+                if i.type == 'DOPESHEET_EDITOR' and (i.mode == 'DOPESHEET' or i.mode == 'ACTION') and context.active_action:
                     return True
         return False
 
     def execute(self, context):
         #print("exec %s" % (self.bl_idname))
-        dopesheet = None
         action = None
         for i in context.area.spaces: #find the dopesheet
-            if i.type == 'DOPESHEET_EDITOR' and (i.mode == 'DOPESHEET' or i.mode == 'ACTION') and i.action:
-                dopesheet = i
-                action = dopesheet.action
+            if i.type == 'DOPESHEET_EDITOR' and (i.mode == 'DOPESHEET' or i.mode == 'ACTION') and context.active_action:
+                action = context.active_action
                 break
 
         #print(dopesheet.type)
         if action:
+            active_slot = context.object.animation_data.action_slot
             removee_fcurve = []
             localdic = {'context' : context}
-            for i in action.groups:
+            for i in action.layers[0].strips[0].channelbag(active_slot).groups:
                 for j in i.channels:
                     if j.data_path.endswith('.location'):
                         pass
@@ -128,7 +126,7 @@ class RemoveInvalidChannelOperator(bpy.types.Operator):
                             removee_fcurve.append(j)
 
             for fcurve in removee_fcurve:
-                action.fcurves.remove(fcurve)
+                action.layers[0].strips[0].channelbag(active_slot).fcurves.remove(fcurve)
 
         return {'FINISHED'}
 
